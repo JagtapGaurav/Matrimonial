@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { getUsers, getShortlistedIds, toggleShortlist } from '@/services/api';
+import { getUsers, getShortlistedIds, toggleShortlist, apiReportUser } from '@/services/api';
 import { User, EducationLevel } from '../types';
 import Header from '../components/Header';
 import ProfileCard from '../components/ProfileCard';
@@ -113,8 +113,8 @@ const UserDashboardPage: React.FC = () => {
   }
 
   const handleReportSubmit = (reason: string) => {
-      if(userToReport) {
-          console.log(`Reporting user ${userToReport.fullName} for reason: ${reason}`);
+      if(userToReport && currentUser) {
+          apiReportUser(currentUser, userToReport, reason);
           alert(`Thank you for your feedback. Profile for ${userToReport.fullName} has been reported.`);
           setUserToReport(null);
       }

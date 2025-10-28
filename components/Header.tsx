@@ -27,12 +27,14 @@ const Header: React.FC<HeaderProps> = ({ onViewMyProfile }) => {
               {!user.isAdmin && (
                 <>
                   {isDashboard && onViewMyProfile && (
-                     <button onClick={onViewMyProfile} className="text-gray-600 hover:text-primary" title="My Profile">
+                     <button onClick={onViewMyProfile} className="flex items-center space-x-2 text-gray-600 hover:text-primary" title="My Profile">
                         <UserCircleIcon className="h-6 w-6"/>
+                        <span className="hidden md:inline text-sm font-medium">My Profile</span>
                      </button>
                   )}
-                  <Link to="/shortlisted" className="text-gray-600 hover:text-primary" title="Shortlisted Profiles">
+                  <Link to="/shortlisted" className="flex items-center space-x-2 text-gray-600 hover:text-primary" title="Shortlisted Profiles">
                     <StarIcon className="h-6 w-6"/>
+                    <span className="hidden md:inline text-sm font-medium">Shortlisted</span>
                   </Link>
                   <Link to="/settings" className="text-gray-600 hover:text-primary" title="Settings">
                     <Cog6ToothIcon className="h-6 w-6"/>

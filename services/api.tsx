@@ -1,9 +1,10 @@
 
-import { User, UserStatus, ReportData, ActivityLog } from '../types';
+import { User, UserStatus, ReportData, ActivityLog, Report } from '../types';
 
 // --- Helper Functions ---
 const USERS_KEY = 'matrimonial_users';
 const LOGS_KEY = 'matrimonial_logs';
+const REPORTS_KEY = 'matrimonial_reports';
 const SESSION_KEY = 'matrimonial_session';
 const SHORTLIST_KEY_PREFIX = 'matrimonial_shortlist_';
 
@@ -47,6 +48,22 @@ const initialDataSetup = () => {
                 occupation: 'System Administrator',
                 address: { fullAddress: '123 Admin Way', city: 'Mumbai', state: 'Maharashtra' },
                 password: 'admin',
+                status: 'Active',
+                isAdmin: true,
+                isDivorced: false,
+            },
+            {
+                id: 'admin-2',
+                profilePhotoUrl: 'https://i.pravatar.cc/150?u=nish@gmail.com',
+                fullName: 'Nish',
+                mobile: '9876543210',
+                email: 'nish@gmail.com',
+                dob: '01/01/1990',
+                gender: 'Male',
+                education: 'PHD',
+                occupation: 'System Administrator',
+                address: { fullAddress: '123 Admin Way', city: 'Mumbai', state: 'Maharashtra' },
+                password: '123123',
                 status: 'Active',
                 isAdmin: true,
                 isDivorced: false,
@@ -219,6 +236,8 @@ export const apiRegister = async (newUser: Omit<User, 'id' | 'status' | 'profile
     return userToSave;
 };
 
+export const apiAdminAddUser = apiRegister; // Admin adding user is same as registration
+
 export const updateUserProfile = async (userId: string, data: Partial<Omit<User, 'id' | 'fullName' | 'dob' | 'email'>>, newProfilePhoto?: File): Promise<User> => {
     let users: User[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
     const userIndex = users.findIndex(u => u.id === userId);
@@ -238,6 +257,55 @@ export const updateUserProfile = async (userId: string, data: Partial<Omit<User,
     logActivity(`Profile updated for ${updatedUser.fullName}`, updatedUser.fullName);
     return updatedUser;
 }
+
+export const apiAdminUpdateUser = async (userId: string, data: Partial<User>, newProfilePhoto?: File): Promise<User> => {
+     let users: User[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex === -1) {
+        throw new Error("User not found");
+    }
+
+    let updatedUser = { ...users[userIndex], ...data };
+
+    if (newProfilePhoto) {
+        const photoUrl = await fileToBase64(newProfilePhoto);
+        updatedUser.profilePhotoUrl = photoUrl;
+    }
+    
+    users[userIndex] = updatedUser;
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    logActivity(`Profile updated for ${updatedUser.fullName} by Admin`, 'Admin');
+    return updatedUser;
+}
+
+export const apiChangeOwnPassword = (userId: string, oldPass: string, newPass: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        let users: User[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+        const userIndex = users.findIndex(u => u.id === userId);
+        if (userIndex === -1) return reject(new Error("User not found"));
+        
+        if (users[userIndex].password !== oldPass) return reject(new Error("Incorrect current password"));
+
+        users[userIndex].password = newPass;
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        logActivity('Admin changed own password', users[userIndex].fullName);
+        resolve();
+    });
+}
+
+export const apiAdminResetUserPassword = (userId: string, newPass: string): Promise<void> => {
+     return new Promise((resolve, reject) => {
+        let users: User[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+        const userIndex = users.findIndex(u => u.id === userId);
+        if (userIndex === -1) return reject(new Error("User not found"));
+        
+        users[userIndex].password = newPass;
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        logActivity(`Password reset for ${users[userIndex].fullName} by Admin`, 'Admin');
+        resolve();
+    });
+}
+
 
 export const getUsers = (): Promise<User[]> => {
     return new Promise((resolve) => {
@@ -307,6 +375,34 @@ export const getActivityLog = (): Promise<ActivityLog[]> => {
         resolve(logs);
     });
 };
+
+// --- Report Functions ---
+export const apiReportUser = (reporter: User, reportedUser: User, reason: string): Promise<Report> => {
+    return new Promise((resolve) => {
+        const reports: Report[] = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
+        const newReport: Report = {
+            id: `report-${new Date().getTime()}`,
+            reporterId: reporter.id,
+            reporterName: reporter.fullName,
+            reportedUserId: reportedUser.id,
+            reportedUserName: reportedUser.fullName,
+            reason,
+            timestamp: new Date().toISOString(),
+        };
+        reports.unshift(newReport);
+        localStorage.setItem(REPORTS_KEY, JSON.stringify(reports));
+        logActivity(`Reported user ${reportedUser.fullName} for: ${reason}`, reporter.fullName);
+        resolve(newReport);
+    });
+};
+
+export const getReports = (): Promise<Report[]> => {
+    return new Promise((resolve) => {
+        const reports: Report[] = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
+        resolve(reports);
+    });
+};
+
 
 // --- Shortlist Functions ---
 export const toggleShortlist = (currentUserId: string, targetUserId: string): Promise<string[]> => {

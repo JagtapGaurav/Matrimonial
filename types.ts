@@ -37,3 +37,13 @@ export interface ReportData {
   name: string;
   users: number;
 }
+
+export interface Report {
+  id: string;
+  reporterId: string;
+  reporterName: string;
+  reportedUserId: string;
+  reportedUserName: string;
+  reason: string;
+  timestamp: string;
+}
