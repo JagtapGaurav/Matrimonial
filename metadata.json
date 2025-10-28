@@ -1,0 +1,5 @@
+{
+  "name": "Matrimonial App",
+  "description": "A modern, mobile-friendly matrimonial application for users to find partners. Features include user registration, profile browsing with filters, and a comprehensive admin panel for user management and reporting.",
+  "requestFramePermissions": []
+}
