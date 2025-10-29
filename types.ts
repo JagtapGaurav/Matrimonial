@@ -1,5 +1,5 @@
 
-export type UserStatus = 'Active' | 'Blocked' | 'Deactivated';
+export type UserStatus = 'Active' | 'Blocked' | 'Deactivated' | 'Deleted';
 export type Gender = 'Male' | 'Female' | 'Other';
 export type EducationLevel = 'Not Educated' | '10th' | '12th' | 'Graduation' | 'Post Graduation' | 'Engineer' | 'MBA' | 'PHD' | 'Doctor';
 

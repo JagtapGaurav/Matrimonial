@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiRegister } from '@/services/api';
@@ -98,9 +97,8 @@ const RegisterPage: React.FC = () => {
 
     try {
         const { confirmPassword, ...userData } = formData;
-        const newUser: Omit<User, 'id' | 'status' | 'profilePhotoUrl'> = {
-            ...userData,
-        }
+        const newUser: Omit<User, 'id' | 'profilePhotoUrl' | 'status'> = userData;
+
       await apiRegister(newUser, formData.profilePhoto);
       setSuccess('Registration successful! Redirecting to login...');
       setTimeout(() => navigate('/login', { state: { message: 'Registration successful! Please log in.' } }), 2000);

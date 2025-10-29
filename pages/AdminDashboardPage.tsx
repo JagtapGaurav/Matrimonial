@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   getAllUsers,
@@ -10,6 +9,7 @@ import {
   apiAdminResetUserPassword,
   apiChangeOwnPassword,
   apiAdminUpdateUser,
+  apiAdminAddUser,
 } from '@/services/api';
 import { User, UserStatus, ReportData, ActivityLog, Report } from '../types';
 import Header from '../components/Header';
@@ -32,6 +32,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../hooks/useAuth';
+import AdminUserModal from '../components/AdminUserModal';
 
 type AdminTab = 'users' | 'reports' | 'usage' | 'logs' | 'settings';
 
@@ -56,11 +57,10 @@ const AdminDashboardPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Modals state
-  const [isEditModalOpen, setEditModalOpen] = useState(false);
-  const [isAddModalOpen, setAddModalOpen] = useState(false);
-  const [isPasswordModalOpen, setPasswordModalOpen] = useState(false);
+  const [isUserModalOpen, setUserModalOpen] = useState(false);
   const [isBulkActionModalOpen, setBulkActionModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [bulkActionType, setBulkActionType] = useState<'newsletter' | 'whatsapp' | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -94,10 +94,22 @@ const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (userId: string) => {
-    if (window.confirm('Are you sure you want to permanently delete this user?')) {
-      await deleteUser(userId);
-      fetchData(); // Refresh data
+  const handleDelete = (user: User) => {
+    setUserToDelete(user);
+  };
+  
+  const confirmDelete = async () => {
+    if (userToDelete) {
+      await deleteUser(userToDelete.id);
+      setUserToDelete(null);
+      fetchData();
+    }
+  };
+
+  const handleRestoreUser = async (userId: string) => {
+    if (window.confirm('Are you sure you want to restore this user? Their status will be set to Active.')) {
+        await updateUserStatus(userId, 'Active');
+        fetchData();
     }
   };
 
@@ -113,9 +125,14 @@ const AdminDashboardPage: React.FC = () => {
       }
   }
 
+  const handleAddUser = () => {
+    setEditingUser(null);
+    setUserModalOpen(true);
+  }
+
   const handleEditUser = (user: User) => {
-      setSelectedUser(user);
-      setEditModalOpen(true);
+      setEditingUser(user);
+      setUserModalOpen(true);
   }
   
   const handleAdminPasswordChange = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -144,18 +161,44 @@ const AdminDashboardPage: React.FC = () => {
       setBulkActionModalOpen(true);
   }
 
-  const filteredUsers = useMemo(() => {
-      return users.filter(user => 
-          !user.isAdmin && (
-          user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.mobile.includes(searchTerm)
-      ));
+  const handleSaveUser = async (userData: Omit<User, 'id'> | Partial<User>, photo?: File) => {
+      try {
+          if (editingUser) { // Edit mode
+              if (window.confirm('Are you sure you want to save changes to this user profile?')) {
+                await apiAdminUpdateUser(editingUser.id, userData, photo);
+                alert('User updated successfully!');
+              } else {
+                  return; // User cancelled
+              }
+          } else { // Add mode
+              await apiAdminAddUser(userData as Omit<User, 'id' | 'profilePhotoUrl'>, photo!);
+              alert('User added successfully!');
+          }
+          setUserModalOpen(false);
+          setEditingUser(null);
+          fetchData();
+      } catch(e: any) {
+          alert('Error: ' + e.message);
+      }
+  };
+
+  const filteredAndActiveUsers = useMemo(() => {
+    return users.filter(user => 
+        !user.isAdmin && user.status !== 'Deleted' && (
+        user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.mobile.includes(searchTerm)
+    ));
   }, [users, searchTerm]);
+
+  const deletedUsers = useMemo(() => {
+      return users.filter(user => user.status === 'Deleted' && !user.isAdmin);
+  }, [users]);
   
   const nonAdminUsers = users.filter(u => !u.isAdmin);
 
   const renderUsers = () => (
+    <>
     <div className="bg-white rounded-lg shadow">
       <div className="p-4 border-b flex flex-wrap items-center justify-between gap-4">
           <div className="relative flex-grow max-w-xs">
@@ -176,7 +219,7 @@ const AdminDashboardPage: React.FC = () => {
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 16 16"><path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.73.73 0 0 0-.529.247c-.182.198-.691.677-.691 1.654s.71 1.916.81 2.049c.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232"/></svg>
                   <span>WhatsApp</span>
               </button>
-              <button onClick={() => setAddModalOpen(true)} className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-focus transition-colors text-sm font-medium">
+              <button onClick={handleAddUser} className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-focus transition-colors text-sm font-medium">
                   <UserPlusIcon className="h-5 w-5"/><span>Add User</span>
               </button>
           </div>
@@ -191,10 +234,10 @@ const AdminDashboardPage: React.FC = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredUsers.map(user => (
+            {filteredAndActiveUsers.map(user => (
               <tr key={user.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <img className="h-10 w-10 rounded-full" src={user.profilePhotoUrl} alt="" />
+                  <img className="h-10 w-10 rounded-full object-cover" src={user.profilePhotoUrl} alt="" />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.fullName}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -207,15 +250,17 @@ const AdminDashboardPage: React.FC = () => {
                       {user.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                   <button onClick={() => handleEditUser(user)} className="text-blue-600 hover:text-blue-900" title="Edit"><PencilIcon className="h-5 w-5"/></button>
-                   <button onClick={() => handleDelete(user.id)} className="text-red-600 hover:text-red-900" title="Delete"><TrashIcon className="h-5 w-5"/></button>
-                   {user.status === 'Active' ? 
-                     <button onClick={() => handleUpdateStatus(user.id, 'Deactivated')} className="text-gray-600 hover:text-gray-900" title="Deactivate"><NoSymbolIcon className="h-5 w-5"/></button>
-                     :
-                     <button onClick={() => handleUpdateStatus(user.id, 'Active')} className="text-green-600 hover:text-green-900" title="Activate"><CheckCircleIcon className="h-5 w-5"/></button>
-                   }
-                   <button onClick={() => handleResetPassword(user.id)} className="text-purple-600 hover:text-purple-900" title="Reset Password"><KeyIcon className="h-5 w-5"/></button>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <div className="flex items-center space-x-2">
+                    <button onClick={() => handleEditUser(user)} className="text-blue-600 hover:text-blue-900" title="Edit"><PencilIcon className="h-5 w-5"/></button>
+                    <button onClick={() => handleDelete(user)} className="text-red-600 hover:text-red-900" title="Delete"><TrashIcon className="h-5 w-5"/></button>
+                    {user.status === 'Active' ? 
+                      <button onClick={() => handleUpdateStatus(user.id, 'Deactivated')} className="text-gray-600 hover:text-gray-900" title="Deactivate"><NoSymbolIcon className="h-5 w-5"/></button>
+                      :
+                      <button onClick={() => handleUpdateStatus(user.id, 'Active')} className="text-green-600 hover:text-green-900" title="Activate"><CheckCircleIcon className="h-5 w-5"/></button>
+                    }
+                    <button onClick={() => handleResetPassword(user.id)} className="text-purple-600 hover:text-purple-900" title="Reset Password"><KeyIcon className="h-5 w-5"/></button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -223,6 +268,42 @@ const AdminDashboardPage: React.FC = () => {
         </table>
       </div>
     </div>
+    
+    {deletedUsers.length > 0 && (
+        <div className="mt-12">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Deleted Profiles</h2>
+            <div className="bg-white rounded-lg shadow overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {deletedUsers.map(user => (
+                            <tr key={user.id}>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <img className="h-10 w-10 rounded-full object-cover" src={user.profilePhotoUrl} alt="" />
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.fullName}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button onClick={() => handleRestoreUser(user.id)} className="flex items-center space-x-2 text-green-600 hover:text-green-800 font-semibold" title="Restore User">
+                                        <ArrowPathIcon className="h-5 w-5"/>
+                                        <span>Restore</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    )}
+    </>
   );
 
   const renderReports = () => (
@@ -332,10 +413,11 @@ const AdminDashboardPage: React.FC = () => {
       <main className="container mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-6">Admin Dashboard</h1>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatCard title="Total Users" value={nonAdminUsers.length} icon={<UsersIcon className="h-6 w-6 text-primary"/>} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+            <StatCard title="Total Users" value={nonAdminUsers.filter(u => u.status !== 'Deleted').length} icon={<UsersIcon className="h-6 w-6 text-primary"/>} />
             <StatCard title="Active Users" value={nonAdminUsers.filter(u=>u.status === 'Active').length} icon={<CheckCircleIcon className="h-6 w-6 text-primary"/>} />
-            <StatCard title="Deactivated" value={nonAdminUsers.filter(u=>u.status !== 'Active').length} icon={<NoSymbolIcon className="h-6 w-6 text-primary"/>} />
+            <StatCard title="Inactive" value={nonAdminUsers.filter(u=>u.status === 'Blocked' || u.status === 'Deactivated').length} icon={<NoSymbolIcon className="h-6 w-6 text-primary"/>} />
+            <StatCard title="Deleted Profiles" value={nonAdminUsers.filter(u=>u.status === 'Deleted').length} icon={<TrashIcon className="h-6 w-6 text-primary"/>} />
             <StatCard title="Profiles Reported" value={reports.length} icon={<ExclamationTriangleIcon className="h-6 w-6 text-primary"/>} />
         </div>
 
@@ -349,12 +431,22 @@ const AdminDashboardPage: React.FC = () => {
         <div>{loading ? <p>Loading...</p> : tabContent[activeTab]()}</div>
       </main>
 
+       <AdminUserModal 
+        isOpen={isUserModalOpen}
+        onClose={() => {
+            setUserModalOpen(false);
+            setEditingUser(null);
+        }}
+        onSave={handleSaveUser}
+        userToEdit={editingUser}
+      />
+
        {isBulkActionModalOpen && (
            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
                    <div className="p-6">
                         <h3 className="text-lg font-bold">Send Bulk {bulkActionType === 'newsletter' ? 'Newsletter' : 'WhatsApp'}</h3>
-                        <p className="text-sm text-gray-500">This message will be sent to all {filteredUsers.length} users in the current view. (This is a simulation).</p>
+                        <p className="text-sm text-gray-500">This message will be sent to all {filteredAndActiveUsers.length} users in the current view. (This is a simulation).</p>
                         <textarea className="w-full h-40 border rounded-lg mt-4 p-2 focus:ring-primary focus:border-primary" placeholder="Compose your message..."></textarea>
                    </div>
                    <div className="px-6 py-3 bg-gray-50 flex justify-end space-x-2">
@@ -363,6 +455,23 @@ const AdminDashboardPage: React.FC = () => {
                    </div>
                </div>
            </div>
+       )}
+
+       {userToDelete && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                <div className="p-6">
+                    <h3 className="text-lg font-bold text-gray-800">Confirm Deletion</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                        Are you sure you want to delete the profile for <strong>{userToDelete.fullName}</strong>? The user will be moved to the deleted profiles list and will no longer be able to log in.
+                    </p>
+                </div>
+                <div className="px-6 py-3 bg-gray-50 flex justify-end space-x-2">
+                    <button onClick={() => setUserToDelete(null)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg text-sm">Cancel</button>
+                    <button onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm">Confirm Delete</button>
+                </div>
+            </div>
+        </div>
        )}
     </>
   );

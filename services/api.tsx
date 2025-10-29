@@ -1,4 +1,3 @@
-
 import { User, UserStatus, ReportData, ActivityLog, Report } from '../types';
 
 // --- Helper Functions ---
@@ -215,7 +214,7 @@ export const apiLogout = () => {
     sessionStorage.removeItem(SESSION_KEY);
 };
 
-export const apiRegister = async (newUser: Omit<User, 'id' | 'status' | 'profilePhotoUrl'>, profilePhoto: File): Promise<User> => {
+export const apiRegister = async (newUser: Omit<User, 'id' | 'profilePhotoUrl' | 'status'>, profilePhoto: File): Promise<User> => {
     const users: User[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
     if (users.some(u => u.email === newUser.email)) {
         throw new Error('An account with this email already exists.');
@@ -224,7 +223,8 @@ export const apiRegister = async (newUser: Omit<User, 'id' | 'status' | 'profile
     const photoUrl = await fileToBase64(profilePhoto);
     
     const userToSave: User = {
-        ...newUser,
+        ...(newUser as Omit<User, 'id' | 'profilePhotoUrl' | 'status' | 'password'>),
+        password: newUser.password,
         id: `user-${new Date().getTime()}`,
         status: 'Active',
         profilePhotoUrl: photoUrl
@@ -236,7 +236,27 @@ export const apiRegister = async (newUser: Omit<User, 'id' | 'status' | 'profile
     return userToSave;
 };
 
-export const apiAdminAddUser = apiRegister; // Admin adding user is same as registration
+export const apiAdminAddUser = async (newUser: Omit<User, 'id' | 'profilePhotoUrl'>, profilePhoto: File): Promise<User> => {
+    const users: User[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    if (users.some(u => u.email === newUser.email)) {
+        throw new Error('An account with this email already exists.');
+    }
+    
+    const photoUrl = await fileToBase64(profilePhoto);
+    
+    const userToSave: User = {
+        ...newUser,
+        id: `user-${new Date().getTime()}`,
+        status: newUser.status || 'Active',
+        profilePhotoUrl: photoUrl
+    };
+
+    users.push(userToSave);
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    logActivity(`User ${userToSave.fullName} created by Admin`, 'Admin');
+    return userToSave;
+};
+
 
 export const updateUserProfile = async (userId: string, data: Partial<Omit<User, 'id' | 'fullName' | 'dob' | 'email'>>, newProfilePhoto?: File): Promise<User> => {
     let users: User[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
@@ -339,13 +359,13 @@ export const updateUserStatus = (userId: string, status: UserStatus): Promise<vo
 export const deleteUser = (userId: string): Promise<void> => {
     return new Promise((resolve, reject) => {
         let users: User[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-        const userToDelete = users.find(u => u.id === userId);
-        if (!userToDelete) {
-             return reject(new Error("User not found"));
+        const userIndex = users.findIndex(u => u.id === userId);
+        if (userIndex === -1) {
+            return reject(new Error("User not found"));
         }
-        const updatedUsers = users.filter(u => u.id !== userId);
-        localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
-        logActivity(`Deleted user ${userToDelete.fullName}`, 'Admin');
+        users[userIndex].status = 'Deleted';
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        logActivity(`Deleted user ${users[userIndex].fullName}`, 'Admin');
         resolve();
     });
 };

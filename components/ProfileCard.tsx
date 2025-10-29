@@ -43,11 +43,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ user, onViewDetails, isShortl
         </div>
       </div>
       <div className="px-4 py-2 flex justify-between items-center border-t border-gray-100 mt-auto">
-          <button onClick={() => onShortlistToggle(user.id)} className={`flex items-center space-x-1 transition-colors text-sm font-medium ${isShortlisted ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-600 hover:text-yellow-500'}`}>
+          <button onClick={() => onShortlistToggle(user.id)} title={isShortlisted ? 'Remove from Shortlist' : 'Add to Shortlist'} className={`flex items-center space-x-1 transition-colors text-sm font-medium ${isShortlisted ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-600 hover:text-yellow-500'}`}>
               {isShortlisted ? <StarSolidIcon className="h-5 w-5"/> : <StarIcon className="h-5 w-5"/>}
               <span>{isShortlisted ? 'Shortlisted' : 'Shortlist'}</span>
           </button>
-          <button onClick={() => onReport(user)} className="flex items-center space-x-1 text-gray-600 hover:text-red-600 transition-colors text-sm font-medium">
+          <button onClick={() => onReport(user)} title="Report this profile" className="flex items-center space-x-1 text-gray-600 hover:text-red-600 transition-colors text-sm font-medium">
               <FlagIcon className="h-5 w-5"/>
               <span>Report</span>
           </button>
